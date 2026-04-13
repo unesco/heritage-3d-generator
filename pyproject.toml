@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "coordinates3d-generator"
+version = "0.1.0"
+description = "UNESCO Heritage Sites 3D Generator with quality presets using VoxCity + Google Earth Engine"
+authors = ["UNESCO Data & AI <dataai@unesco.org>"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.12,<3.13"
+voxcity = "0.5.22"
+pandas = "^2.0.0"
+python-dotenv = "^1.0.1"
+setuptools = "<81.0.0"
+rich = "^13.7.1"
+tenacity = "^8.2.3"
+argparse = "^1.4.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
