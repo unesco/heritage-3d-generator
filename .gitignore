@@ -1,8 +1,14 @@
-# Environment
+# Environment & secrets (never commit)
 .env
 .venv/
 venv/
 env/
+*.pem
+*.key
+*credentials*
+*_secrets.*
+secrets*.env
+hf_job_secrets.*
 
 # Python
 __pycache__/
@@ -24,12 +30,18 @@ build/
 .DS_Store
 Thumbs.db
 
-# Output (generated 3D models)
-output/*.obj
-output/*.mtl
-output/*.txt
-output/*.INX
+# Output (generated 3D models, per-site directories)
+output/*
 !output/.gitkeep
 
-# Model caches
+# Model & download caches
 .cache/
+.voxcity/
+
+# Fetched UNESCO catalogs (regenerate with: python unesco_data.py)
+data/whc001.csv
+data/mab001.csv
+data/sites.csv
+
+# Journal PDFs (copyright — do not redistribute publicly)
+wiki/*.pdf

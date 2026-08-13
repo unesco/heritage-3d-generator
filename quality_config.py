@@ -71,7 +71,7 @@ class QualityManager:
             mesh_size=10,   # 10m voxels
             building_source="OpenStreetMap",
             land_cover_source="OpenStreetMap", 
-            canopy_height_source="ETH Global Sentinel-2 10m",
+            canopy_height_source="ETH Global Sentinel-2 10m Canopy Height (2020)",
             dem_source="FABDEM",
             dem_interpolation=False,
             estimated_time="30-60 seconds",
@@ -87,7 +87,7 @@ class QualityManager:
             mesh_size=5,    # 5m voxels
             building_source="OpenStreetMap",
             land_cover_source="OpenStreetMap",
-            canopy_height_source="ETH Global Sentinel-2 10m",
+            canopy_height_source="ETH Global Sentinel-2 10m Canopy Height (2020)",
             dem_source="FABDEM", 
             dem_interpolation=True,
             estimated_time="2-4 minutes",

@@ -92,7 +92,7 @@ poetry run python setup.py --test
 poetry run earthengine authenticate
 
 # Set project ID
-poetry run earthengine set_project xyto3d
+poetry run earthengine set_project <your-gee-project-id>
 ```
 
 ## 📁 File Operations

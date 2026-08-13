@@ -150,36 +150,20 @@ def setup_environment():
     env_path = Path(".env")
     
     if not env_path.exists():
-        console.print("[yellow]⚠️ .env file not found, creating default...[/yellow]")
+        console.print("[yellow]⚠️ .env file not found, creating from .env.example...[/yellow]")
         
-        default_env = """# Earth Engine Project ID (required)
-# Change this to your Earth Engine project ID
-EE_PROJECT_ID=coordinates3d-generator
-
-# Suppress warnings
-PYTHONWARNINGS=ignore::UserWarning:geemap.*
-
-# Quality preset: STANDARD - Balanced quality and speed
-# Applied on: 2025-01-01 12:00:00
-
-# Zone parameters
-ZONE_SIZE_METERS=750
-MESH_SIZE_METERS=5
-
-# Data sources
-BUILDING_SOURCE=OpenStreetMap
-LAND_COVER_SOURCE=OpenStreetMap
-CANOPY_HEIGHT_SOURCE=ETH Global Sentinel-2 10m
-DEM_SOURCE=FABDEM
-DEM_INTERPOLATION=true
-
-# Output directory
-OUTPUT_DIR=output
-"""
-        with open(env_path, 'w') as f:
-            f.write(default_env)
+        example_path = Path(".env.example")
+        if example_path.exists():
+            import shutil
+            shutil.copy(example_path, env_path)
+        else:
+            with open(env_path, 'w') as f:
+                f.write("# Earth Engine Project ID (required)\n"
+                        "EE_PROJECT_ID=your-gee-project-id\n\n"
+                        "# Output directory\n"
+                        "OUTPUT_DIR=output\n")
         
-        console.print("[green]✅ Created default .env file with STANDARD quality preset[/green]")
+        console.print("[green]✅ Created .env — edit it and set EE_PROJECT_ID[/green]")
     else:
         console.print("[green]✅ .env file exists[/green]")
     

@@ -7,9 +7,13 @@ package-mode = false
 
 [tool.poetry.dependencies]
 python = ">=3.12,<3.13"
-voxcity = "0.5.22"
+voxcity = "^1.6.2"
+overturemaps = "^1.0.1"  # 0.15.0 pins a rotated-out Overture S3 release
+mapbox-earcut = "^1.0"   # triangulation engine for LOD1 building prisms (smooth export)
 pandas = "^2.0.0"
 python-dotenv = "^1.0.1"
+huggingface-hub = "^0.30"
+requests = "^2.32"
 setuptools = "<81.0.0"
 rich = "^13.7.1"
 tenacity = "^8.2.3"

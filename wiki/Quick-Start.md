@@ -7,7 +7,7 @@ Generate your first UNESCO heritage site 3D model in 5 minutes!
 Once you have everything set up, test with Mont-Saint-Michel:
 
 ```bash
-cd /path/to/xyto3d
+cd /path/to/heritage-3d-generator
 poetry run python run.py test
 ```
 
@@ -128,7 +128,7 @@ poetry run python debug_export.py
 ```bash
 # Re-authenticate
 poetry run earthengine authenticate
-poetry run earthengine set_project xyto3d
+poetry run earthengine set_project <your-gee-project-id>
 ```
 
 ### No Buildings Visible
@@ -173,7 +173,7 @@ brew install --cask meshlab
 ### Check the basics:
 ```bash
 # 1. Are you in the right directory?
-pwd  # Should show: .../xyto3d
+pwd  # Should show: .../heritage-3d-generator
 
 # 2. Is Earth Engine working?
 poetry run earthengine ls

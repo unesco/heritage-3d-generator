@@ -1,6 +1,6 @@
 # UNESCO Heritage Sites 3D Generator
 
-> Generate detailed 3D models of UNESCO World Heritage Sites using Google Earth Engine and VoxCity
+> Generate detailed 3D models of UNESCO World Heritage Sites and Biosphere Reserves using Google Earth Engine and VoxCity 1.6 — quality-gated and published to Hugging Face
 
 [![UNESCO Data & AI](https://img.shields.io/badge/UNESCO-Data%20%26%20AI-0077B6?logo=united-nations&logoColor=white)](https://github.com/unesco)
 [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/downloads/)
@@ -8,7 +8,50 @@
 
 **[Complete Wiki & Guides](wiki/README.md)** | **[Quick Start](wiki/Quick-Start.md)** | **[Parameter Tuning](wiki/Parameter-Tuning.md)**
 
-## ✨ New: Quality Preset System
+## 🌍 End-to-End Pipeline (new)
+
+Fetch the full UNESCO catalogs, batch-generate quality-gated 3D models, and publish to a private Hugging Face dataset:
+
+```bash
+# 1. Fetch site catalogs (WHC whc001 + MAB mab001 → data/sites.csv, ~2,040 sites)
+poetry run python unesco_data.py
+
+# 2. Batch generate (pilot: 5 WHC + 5 MAB, premium quality, resume-safe)
+poetry run python batch.py --pilot
+
+# 3. Upload quality-passed models to HF (HF_TOKEN with write access)
+export HF_TOKEN=hf_...
+export HF_DATASET_REPO=your-username/heritage-3d-models
+poetry run python upload_hf.py            # add --dry-run to preview
+```
+
+Every generated site is checked by an automated **quality gate** (`quality_gate.py`):
+models with degenerate geometry, missing terrain, or missing buildings (for
+Cultural/Mixed sites) are **failed** and never uploaded; models built from
+degraded fallback data sources are **flagged** for manual review. Each site
+directory contains `model.obj`/`model.mtl`, a `preview.png` for visual
+inspection, `metadata.json` (provenance + generation config), and
+`quality.json` (metrics + status).
+
+Prerequisite: Earth Engine authentication (`poetry run earthengine authenticate`,
+project ID via `EE_PROJECT_ID` in `.env` — copy `.env.example` and set your own
+GEE project id; `.env` is git-ignored).
+
+Each site directory contains `model.obj`/`model.mtl` (voxel), `model.glb`
+(web-friendly voxel, Y-up, colored), `model_smooth.glb` (non-voxel hybrid:
+triangulated DEM terrain + LOD1 building prisms), a `preview.png` for visual
+inspection, `metadata.json` (provenance + generation config), and
+`quality.json` (metrics + status).
+
+### 🤗 Running on Hugging Face Jobs (optional)
+
+`submit_hf_job.sh` runs the whole pipeline on HF Jobs infrastructure (code
+bundle → batch → upload, EE credentials passed as job secrets). All account-
+specific values are environment-driven — see the header of the script:
+`HF_TOKEN`, `HF_DATASET_REPO`, `EE_PROJECT_ID`, optional `HF_JOB_NAMESPACE`
+(org billing). Note: HF Jobs is pay-as-you-go.
+
+## ✨ Quality Preset System
 
 Choose from **4 optimized quality levels** for different use cases:
 
@@ -42,8 +85,9 @@ poetry run python main.py
 # Quick test (Mont-Saint-Michel)
 poetry run python main.py test
 
-# Specific site by ID
-poetry run python main.py 4
+# Specific site by key (whc:<id_no> or mab:<mab_id>)
+poetry run python main.py whc:274      # Machu Picchu
+poetry run python main.py mab:USYe1976 # Yellowstone - Grand Teton
 ```
 
 ### Quality Preset Usage
@@ -55,7 +99,7 @@ poetry run python main.py --quality premium   # High quality
 poetry run python main.py --quality ultimate  # Maximum quality
 
 # Site + Quality combination
-poetry run python main.py 4 --quality premium  # Machu Picchu in high quality
+poetry run python main.py whc:274 --quality ultimate  # Machu Picchu in max quality
 ```
 
 ### Information Commands
@@ -87,22 +131,30 @@ poetry run python setup.py --validate
 ### Earth Engine Setup (One-time)
 ```bash
 poetry run earthengine authenticate
-poetry run earthengine set_project xyto3d
+poetry run earthengine set_project <your-gee-project-id>
 ```
 
 ## 🗂️ Project Structure
 
 ```
-Coordinates3D_Generator/
-├── main.py                         # 🎯 Enhanced main script with quality presets
+heritage-3d-generator/
+├── main.py                         # 🎯 Single-site CLI (site key, row number, or 'test')
+├── pipeline.py                     # 🏗️ Shared generation core (VoxCity 1.6, fallback chain)
+├── batch.py                        # 📦 Batch runner (pilot / selected / all, resume-safe)
+├── quality_gate.py                 # 🎯 Quality metrics, pass/flag/fail, preview PNG
+├── smooth_export.py                # 🏙️ Smooth GLB export (DEM terrain + LOD1 buildings)
+├── regen_smooth.py                 # 🔁 Re-export smooth GLBs after exporter improvements
+├── upload_hf.py                    # 🤗 Publish passed models to a HF dataset
+├── unesco_data.py                  # 🌍 Fetch whc001 + mab001 catalogs (Huwise API)
+├── submit_hf_job.sh                # ☁️ Run the pipeline on HF Jobs (optional)
 ├── quality_config.py               # 🎯 Quality configuration system
 ├── setup.py                        # 🛠️ Setup and validation script
-├── enhanced_export.py              # 🎨 Colored OBJ export
 ├── data/
-│   └── unesco_heritage_sites.csv   # 🏛️ UNESCO sites database (10 sites)
-├── output/                         # 📁 Generated 3D models (.obj, .mtl, reports)
+│   ├── unesco_heritage_sites.csv   # 🏛️ Legacy 10-site database
+│   └── sites.csv                   # 🌍 Normalized catalog (generated, git-ignored)
+├── output/                         # 📁 Per-site dirs: OBJ/GLB/smooth GLB, preview, metadata
 ├── wiki/                           # 📚 Complete documentation
-├── .env                            # ⚙️ Configuration & quality settings
+├── .env.example                    # ⚙️ Config template (copy to git-ignored .env)
 └── pyproject.toml                  # 📦 Poetry dependencies
 ```
 
@@ -207,7 +259,7 @@ custom = QualityConfig(
 1. **Earth Engine Authentication**:
    ```bash
    poetry run earthengine authenticate
-   poetry run earthengine set_project xyto3d
+   poetry run earthengine set_project <your-gee-project-id>
    ```
 
 2. **Quality System Not Available**:
@@ -233,6 +285,19 @@ custom = QualityConfig(
 | PREMIUM | 111K | ~15MB | High | Research, analysis |
 | ULTIMATE | 360K | ~50MB | Very High | Archive, critical work |
 
+## 🔒 Secrets & Sanitization
+
+This repo is safe for public release by design:
+
+- **No credentials in the repo** — `HF_TOKEN`, `EE_PROJECT_ID`, `HF_DATASET_REPO`
+  are read from the environment / `.env` (git-ignored; use `.env.example` as template)
+- **Earth Engine credentials** stay in `~/.config/earthengine/` and are only ever
+  passed as HF Job secrets at submit time (never written to the repo)
+- `.gitignore` covers `.env`, outputs, caches, fetched catalogs, secret-file
+  patterns, and journal PDFs (copyright)
+- UNESCO site coordinates come from the **public** data.unesco.org API —
+  no internal endpoints anywhere
+
 ## 🤝 Contributing
 
 This project supports UNESCO's mission of World Heritage preservation through digital documentation.
@@ -256,12 +321,14 @@ poetry run python main.py test --quality preview
 
 ## 📝 Technical Details
 
-- **VoxCity Version**: 0.5.22
+- **VoxCity Version**: 1.6.2 (new object-based API: `get_voxcity()` returns a `VoxCity` dataclass)
 - **Python**: 3.12+
-- **Dependencies**: Rich, Pandas, Earth Engine API, Tenacity
-- **Export Formats**: OBJ, ENVI-MET (INX), Quality Reports
+- **Dependencies**: Rich, Pandas, Earth Engine API, Tenacity, Hugging Face Hub, Requests
+- **Export Formats**: OBJ (+MTL), ENVI-MET (INX, opt-in via `--envimet`)
 - **Data Sources**: OpenStreetMap, Google Earth Engine, ESRI, Microsoft
-- **Fallback Logic**: Automatic source switching on failures
+- **Site Catalogs**: UNESCO data.unesco.org (Huwise API) — whc001 (1,244 sites) + mab001 (797 sites)
+- **Quality Gate**: automated metrics + pass/flag/fail before any HF publication
+- **Fallback Logic**: 7-strategy automatic source switching on failures
 
 ## 🌟 Features
 

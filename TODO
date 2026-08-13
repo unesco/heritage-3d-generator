@@ -1,4 +1,9 @@
-* move to library mode ideally
-* add solar feature forecasting
-* manage output naming and choose only of files to output
-* Improve results
+* ~~move to library mode ideally~~ → done: upgraded to VoxCity 1.6 object API (pipeline.py)
+* ~~manage output naming and choose only of files to output~~ → done: per-site dirs, OBJ+GLB+smooth GLB (ENVI-MET opt-in via --envimet)
+* ~~Improve results~~ → done: quality gate + auto-first fallback chain + Overpass-free EE strategies + alt-DEM (COPERNICUS) for coastal gaps
+* ~~Minecraft effect~~ → done: smooth_export.py (triangulated DEM + LOD1 building prisms → model_smooth.glb)
+* ~~sanitize for public release~~ → done: env-driven config, .env.example, hardened .gitignore, no creds/internal URLs
+* add solar feature forecasting (VoxCity 1.6 simulator.solar — next iteration)
+* scale pilot (10 sites) → full catalog (~2,041 sites) via HF Jobs (submit_hf_job.sh --all)
+* flip HF dataset to public once validated
+* Overture buildings: re-enable when voxcity fixes Overture voxelization (0 buildings in 1.6.2)
