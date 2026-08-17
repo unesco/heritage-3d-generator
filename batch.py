@@ -88,6 +88,15 @@ def resolve_sites(args) -> list:
             sites.append(match.iloc[0].to_dict())
     for key in missing:
         console.print(f"[red]❌ Unknown site_key: {key}[/red]")
+    if args.shard:
+        try:
+            k, n = (int(x) for x in args.shard.split("/"))
+            if not (0 <= k < n):
+                raise ValueError
+        except ValueError:
+            sys.exit(f"Invalid --shard '{args.shard}' — expected K/N with 0 <= K < N")
+        sites = [s for idx, s in enumerate(sites) if idx % n == k]
+        console.print(f"[cyan]🔀 Shard {k}/{n}: {len(sites)} sites[/cyan]")
     if args.limit:
         sites = sites[: args.limit]
     return sites
@@ -100,6 +109,9 @@ def main():
     parser.add_argument("--sites", nargs="+", help="Site keys (whc:80 mab:USYe1976 ...)")
     parser.add_argument("--all", action="store_true", help="Full catalog")
     parser.add_argument("--limit", type=int, help="Max number of sites")
+    parser.add_argument("--shard", metavar="K/N",
+                        help="Process only shard K of N (0-based): sites whose "
+                             "index %% N == K. For parallel HF Jobs.")
     parser.add_argument("--quality", default="premium",
                         choices=["preview", "standard", "premium", "ultimate"],
                         help="Quality preset (default: premium)")

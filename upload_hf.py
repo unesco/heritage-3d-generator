@@ -192,6 +192,44 @@ _Generated {datetime.now(timezone.utc).date().isoformat()} by the UNESCO Data & 
 """
 
 
+def rebuild_card_from_hub(repo: str, token: str):
+    """Rebuild README.md + metadata.jsonl from per-site files already on the Hub.
+
+    Needed after parallel shard jobs: each shard uploads only its own sites
+    (with --no-card), so the final card must aggregate all shards server-side.
+    """
+    from huggingface_hub import hf_hub_download
+
+    api = HfApi(token=token)
+    files = api.list_repo_files(repo, repo_type="dataset")
+    sites = []
+    for f in sorted(files):
+        parts = f.split("/")
+        if len(parts) != 3 or parts[2] != "metadata.json":
+            continue
+        programme, site_dir, _ = parts
+        site_path = hf_hub_download(repo, f, repo_type="dataset", token=token)
+        metadata = json.loads(Path(site_path).read_text())
+        quality = {"status": "unknown"}
+        qf = f"{programme}/{site_dir}/quality.json"
+        if qf in files:
+            q_path = hf_hub_download(repo, qf, repo_type="dataset", token=token)
+            quality = json.loads(Path(q_path).read_text())
+        sites.append({"dir": Path(site_dir), "programme": programme,
+                      "metadata": metadata, "quality": quality})
+    if not sites:
+        sys.exit(f"No site metadata found in {repo}")
+    tmp = Path("output/.hf_upload")
+    tmp.mkdir(exist_ok=True)
+    (tmp / "metadata.jsonl").write_text(build_metadata_jsonl(sites))
+    (tmp / "README.md").write_text(build_readme(sites))
+    for name in ("metadata.jsonl", "README.md"):
+        api.upload_file(path_or_fileobj=str(tmp / name), path_in_repo=name,
+                        repo_id=repo, repo_type="dataset")
+    print(f"🃏 Card rebuilt from {len(sites)} sites — "
+          f"https://huggingface.co/datasets/{repo}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -201,11 +239,21 @@ def main():
     parser.add_argument("--preset", default="premium",
                         help="Only upload models generated at this preset (default: premium)")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--no-card", action="store_true",
+                        help="Skip README.md + metadata.jsonl (use for parallel "
+                             "shards so they don't overwrite each other's card)")
+    parser.add_argument("--rebuild-card", action="store_true",
+                        help="Rebuild README.md + metadata.jsonl from the site "
+                             "folders already on the Hub, then exit")
     args = parser.parse_args()
 
     token = os.environ.get("HF_TOKEN")
     if not token and not args.dry_run:
         sys.exit("HF_TOKEN not set — export a Hugging Face token with write access")
+
+    if args.rebuild_card:
+        rebuild_card_from_hub(args.repo, token)
+        return
 
     sites = collect_sites(args.include_flagged, args.preset)
     if not sites:
@@ -236,7 +284,11 @@ def main():
                           repo_id=args.repo, repo_type="dataset",
                           ignore_patterns=["*.h5", "*.inx", "*.edb"])
 
-    # Root-level index + dataset card
+    # Root-level index + dataset card (skipped for parallel shards)
+    if args.no_card:
+        print("⏭️  --no-card: skipping README.md/metadata.jsonl "
+              "(rebuild later with --rebuild-card)")
+        return
     tmp = Path("output/.hf_upload")
     tmp.mkdir(exist_ok=True)
     (tmp / "metadata.jsonl").write_text(build_metadata_jsonl(sites))
