@@ -45,3 +45,4 @@ data/sites.csv
 
 # Journal PDFs (copyright — do not redistribute publicly)
 wiki/*.pdf
+.playwright-mcp/

@@ -24,6 +24,14 @@ from voxcity.utils.projector import GridProjector
 DEFAULT_BUILDING_HEIGHT_M = 10.0
 BUILDING_RGBA = [205, 205, 210, 255]  # light neutral gray
 
+# Terrain colors that read correctly on a dark viewer background. The raw
+# voxcity palette paints water (9) and herbaceous wetland / tidal flats (8)
+# in near-black tones, which looks like a hole in web viewers.
+TERRAIN_COLOR_OVERRIDES = {
+    8: [140, 158, 116, 255],   # herbaceous wetland / tidal flat -> marsh tone
+    9: [74, 133, 190, 255],    # water -> clearly blue
+}
+
 
 def _palette() -> dict:
     """VoxCity class index -> RGBA (0-255)."""
@@ -51,12 +59,15 @@ def _terrain_mesh(dem: np.ndarray, land_cover: np.ndarray, meshsize: float,
     v1 = v0 + 1
     v2 = v0 + nj
     v3 = v2 + 1
+    # CCW winding so face normals point UP (+z); the reverse order leaves the
+    # surface invisible from above in single-sided glTF viewers.
     faces = np.empty((len(a) * 2, 3), dtype=np.int64)
-    faces[0::2] = np.column_stack([v0, v2, v1])
-    faces[1::2] = np.column_stack([v1, v2, v3])
+    faces[0::2] = np.column_stack([v0, v1, v2])
+    faces[1::2] = np.column_stack([v1, v3, v2])
 
     fallback = [190, 190, 190, 255]
-    vcolors = np.array([palette.get(int(c), fallback) for c in lc.ravel()],
+    vcolors = np.array([TERRAIN_COLOR_OVERRIDES.get(int(c)) or
+                        palette.get(int(c), fallback) for c in lc.ravel()],
                        dtype=np.uint8)
     return trimesh.Trimesh(vertices=verts, faces=faces,
                            vertex_colors=vcolors, process=False)
@@ -123,13 +134,9 @@ def export_smooth_glb(voxcity, out_path, terrain_stride: int = 1) -> Optional[Pa
         ms = float(voxcity.voxels.meta.meshsize)
         palette = _palette()
 
-        # The voxel grid has better water detection (coastline processing) than
-        # the raw land cover grid — let it win for water cells.
-        WATER_CLASS = 9
-        vox = np.asarray(voxcity.voxels.classes)
-        if vox.shape[:2] == land_cover.shape:
-            land_cover = np.where((vox == WATER_CLASS).any(axis=2),
-                                  WATER_CLASS, land_cover)
+        # Terrain color comes from the land-cover grid only. Voxel water must
+        # NOT override it: voxcity marks wetland/tidal-flat columns as water
+        # at the bottom level, which painted whole bays as fake dark water.
 
         scene = trimesh.Scene()
         scene.add_geometry(_terrain_mesh(dem, land_cover, ms, palette,
