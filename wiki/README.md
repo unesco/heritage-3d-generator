@@ -16,6 +16,7 @@ Welcome to the comprehensive guide for generating 3D models of UNESCO World Heri
 
 ### 🎨 Visualization & Export
 - [**3D Viewing Tools**](3D-Viewing-Tools.md) - Local and online viewers
+- [**Analysis Layers**](Analysis-Layers.md) - ☀️ Solar irradiance, 🌳 Green View Index, 🌤️ Sky View Index
 - [**Export Formats**](Export-Formats.md) - OBJ, ENVI-MET, and more
 - [**Post-Processing**](Post-Processing.md) - Enhance your models
 

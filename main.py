@@ -81,6 +81,8 @@ def parse_arguments():
     parser.add_argument("--output-dir", default="output")
     parser.add_argument("--envimet", action="store_true",
                         help="Also export ENVI-MET files (off by default)")
+    parser.add_argument("--no-analysis", action="store_true",
+                        help="Skip solar/view-index analysis layers")
     parser.add_argument("--list-quality", action="store_true")
     parser.add_argument("--quality-details",
                         choices=["preview", "standard", "premium", "ultimate"])
@@ -110,7 +112,8 @@ def main():
                   f"{site['lat']:.4f}°, {site['lon']:.4f}°)")
 
     result = generate_site(site, preset_name=args.quality,
-                           output_root=args.output_dir, envimet=args.envimet)
+                           output_root=args.output_dir, envimet=args.envimet,
+                           analysis=not args.no_analysis)
 
     if result["status"] in ("passed", "flagged"):
         console.print(Panel(

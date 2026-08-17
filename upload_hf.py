@@ -12,7 +12,9 @@ Usage:
 Target repo: --repo flag or HF_DATASET_REPO env var.
 Repo layout:
     whc/<id>_<slug>/{model.obj, model.mtl, model.glb, model_smooth.glb,
-                     preview.png, metadata.json, quality.json}
+                     preview.png, solar_solstice_noon/day.png/.npz,
+                     green_index.png/.npz, sky_index.png/.npz,
+                     metadata.json, quality.json}
     mab/<id>_<slug>/...
     metadata.jsonl   # one record per uploaded site
     README.md        # dataset card
@@ -30,7 +32,7 @@ from huggingface_hub import HfApi
 DEFAULT_REPO = os.environ.get("HF_DATASET_REPO", "your-username/heritage-3d-models")
 OUTPUT_ROOT = Path("output")
 
-UPLOAD_SUFFIXES = {".obj", ".mtl", ".glb", ".png", ".json"}
+UPLOAD_SUFFIXES = {".obj", ".mtl", ".glb", ".png", ".json", ".npz"}
 
 
 def collect_sites(include_flagged: bool, preset: str = None) -> list:
@@ -72,10 +74,11 @@ def build_metadata_jsonl(sites: list) -> str:
 def build_readme(sites: list) -> str:
     n_whc = sum(1 for s in sites if s["programme"] == "whc")
     n_mab = sum(1 for s in sites if s["programme"] == "mab")
+    status_icon = {"passed": "✅", "flagged": "⚠️", "failed": "❌"}
     rows = "\n".join(
-        f"| {s['metadata']['site_key']} | {s['metadata']['name']} | "
+        f"| `{s['metadata']['site_key']}` | {s['metadata']['name']} | "
         f"{s['metadata']['country']} | {s['metadata']['category']} | "
-        f"{s['quality']['status']} |"
+        f"{status_icon.get(s['quality']['status'], '❔')} {s['quality']['status']} |"
         for s in sites
     )
     return f"""---
@@ -87,34 +90,103 @@ tags:
   - 3d-models
   - voxel
   - voxcity
+  - solar-irradiance
+  - green-view-index
+  - sky-view-index
+  - digital-twin
 pretty_name: UNESCO Heritage 3D Models
 ---
 
-# UNESCO Heritage 3D Models
+# 🏛️ UNESCO Heritage 3D Models
 
-Voxel-based 3D models of UNESCO World Heritage sites and Biosphere Reserves,
-generated with [VoxCity](https://github.com/kunifujiwara/VoxCity) from open
-geospatial data (OpenStreetMap, ETH canopy, FABDEM terrain via Google Earth Engine).
+> **3D digital twins of UNESCO World Heritage Sites & Biosphere Reserves** —
+> quality-gated voxel models with environmental analysis layers, generated
+> from open geospatial data with [VoxCity](https://github.com/kunifujiwara/VoxCity).
 
-Site coordinates and metadata come from UNESCO's open data portal:
-- [World Heritage List (whc001)](https://data.unesco.org/explore/dataset/whc001/)
-- [Man and the Biosphere Programme (mab001)](https://data.unesco.org/explore/dataset/mab001/)
+🌍 **{n_whc} World Heritage sites** · 🌿 **{n_mab} Biosphere Reserves** · ✅ **automated quality gate**
 
-Only models that **passed the automated quality gate** are published here
-(building/terrain/land-cover plausibility checks; see each site's `quality.json`).
+## 📦 What's inside
 
-## Contents
+Each site ships as a folder under `whc/` or `mab/`:
 
-- {n_whc} World Heritage sites, {n_mab} Biosphere Reserves
-- Per site: `model.obj` + `model.mtl` (voxel geometry), `model.glb`
-  (web-friendly voxel, Y-up, colored), `model_smooth.glb` (non-voxel hybrid:
-  triangulated DEM terrain + LOD1 building prisms), `preview.png`,
-  `metadata.json` (provenance + generation config), `quality.json` (metrics)
-- `metadata.jsonl` at the root indexes all sites
+```
+<programme>/<id>_<slug>/
+├── model.obj / model.mtl        # 🧱 voxel geometry (original)
+├── model.glb                    # 🌐 web-friendly voxel (Y-up, colored)
+├── model_smooth.glb             # 🏙️ smooth hybrid: DEM terrain + LOD1 buildings
+├── preview.png                  # 👁️ 3D render for quick inspection
+├── solar_solstice_noon.png/.npz # ☀️ instantaneous irradiance, Jun 21 12:00 (W/m²)
+├── solar_solstice_day.png/.npz  # 📆 cumulative irradiance, Jun 21 day (Wh/m²·day)
+├── green_index.png/.npz         # 🌳 Green View Index at pedestrian level (0–1)
+├── sky_index.png/.npz           # 🌤️ Sky View Index at pedestrian level (0–1)
+├── metadata.json                # 📋 provenance + generation config
+└── quality.json                 # 🎯 quality-gate metrics + status
+```
+
+`metadata.jsonl` at the root indexes all sites.
+
+## ☀️ Analysis layers — useful, not just beautiful
+
+Beyond geometry, every model carries **simulation-ready environmental layers**
+computed on the voxel grid (viewpoint height 1.5 m, tree parameters k=0.6,
+LAD=1.0; solar uses the nearest EPW weather file):
+
+| Layer | What it tells you | Typical use |
+|---|---|---|
+| ☀️ **Solar irradiance** (noon / full day, summer solstice) | Sun exposure & shading of facades and ground | Solar potential, heat-stress hotspots, visitor comfort |
+| 🌳 **Green View Index** | How much vegetation a pedestrian sees | Greenery assessment, wellbeing, urban forestry |
+| 🌤️ **Sky View Index** | Sky openness from the ground | Canyon effects, ventilation, daylight access |
+
+Raw grids are provided as compressed `.npz` for downstream analysis:
+
+```python
+import numpy as np
+grid = np.load("solar_solstice_day.npz")["grid"]  # 2D array, Wh/m²·day
+```
+
+View a model directly in the browser: drag `model.glb` onto
+[3dviewer.net](https://3dviewer.net/) or any glTF viewer.
+
+## 🎯 Quality gate
+
+Only models that **passed the automated quality gate** are published here —
+checks include degenerate geometry, terrain relief, and building plausibility
+for Cultural/Mixed sites (see each site's `quality.json`). Models built from
+degraded fallback data sources are **flagged** for manual review and included
+only when noted.
+
+## 🗺️ Data sources
+
+- 📍 Site coordinates & metadata: UNESCO open data portal —
+  [World Heritage List (whc001)](https://data.unesco.org/explore/dataset/whc001/),
+  [Man and the Biosphere Programme (mab001)](https://data.unesco.org/explore/dataset/mab001/)
+- 🏢 Buildings: OpenStreetMap / Overture Maps footprints
+- 🌲 Canopy: ETH Global Sentinel-2 10 m canopy height
+- ⛰️ Terrain: FABDEM / Copernicus DEM via Google Earth Engine
+- 🌦️ Weather: nearest EPW (Ladybug Tools / EnergyPlus)
+
+## 📊 Sites in this release
 
 | site_key | name | country | category | quality |
 |---|---|---|---|---|
 {rows}
+
+## 🔧 Reproduce
+
+Generated with the open-source pipeline:
+[unesco/heritage-3d-generator](https://github.com/unesco/heritage-3d-generator)
+
+```bash
+poetry run python unesco_data.py   # fetch UNESCO catalogs
+poetry run python batch.py --pilot # generate + quality gate + analysis
+poetry run python upload_hf.py     # publish to HF
+```
+
+## 📜 License & attribution
+
+CC-BY-SA-4.0. Contains OpenStreetMap data © OpenStreetMap contributors (ODbL),
+Overture Maps data (CDLA-Permissive), and derived Earth Engine products.
+Please credit **UNESCO Data & AI** and the underlying data providers when reusing.
 
 _Generated {datetime.now(timezone.utc).date().isoformat()} by the UNESCO Data & AI team._
 """

@@ -369,7 +369,8 @@ def get_config(preset_name: str, output_root: str) -> dict:
 
 
 def generate_site(site: dict, preset_name: str = "premium",
-                  output_root: str = "output", envimet: bool = False) -> dict:
+                  output_root: str = "output", envimet: bool = False,
+                  analysis: bool = True) -> dict:
     """Full pipeline for one site. Returns a result dict (also written to disk)."""
     import voxcity as _voxcity_pkg
 
@@ -436,6 +437,15 @@ def generate_site(site: dict, preset_name: str = "premium",
         result["status"] = report["status"]
         result["quality"] = report
 
+        # Analysis layers (solar irradiance, green/sky view index)
+        analysis_artifacts = {}
+        if analysis:
+            try:
+                from analysis import run_analysis
+                analysis_artifacts = run_analysis(voxcity, out_dir, site)
+            except Exception as e:
+                console.print(f"[yellow]⚠️  Analysis layers failed: {e}[/yellow]")
+
         # Sources actually used (recorded by voxcity, incl. auto-selection)
         selected = dict((voxcity.extras or {}).get("selected_sources", {}) or {})
 
@@ -467,6 +477,7 @@ def generate_site(site: dict, preset_name: str = "premium",
             },
             "quality_status": report["status"],
             "quality_metrics": report["metrics"],
+            "analysis_artifacts": analysis_artifacts,
         }
         with open(out_dir / "metadata.json", "w") as f:
             json.dump(metadata, f, indent=2, ensure_ascii=False)

@@ -105,6 +105,8 @@ def main():
                         help="Quality preset (default: premium)")
     parser.add_argument("--output-dir", default="output")
     parser.add_argument("--envimet", action="store_true", help="Also export ENVI-MET")
+    parser.add_argument("--no-analysis", action="store_true",
+                        help="Skip solar/view-index analysis layers")
     args = parser.parse_args()
 
     sites = resolve_sites(args)
@@ -118,7 +120,8 @@ def main():
             continue
         console.print(f"\n[bold]▶ [{i}/{len(sites)}] {site['name']}[/bold]")
         result = generate_site(site, preset_name=args.quality,
-                               output_root=args.output_dir, envimet=args.envimet)
+                               output_root=args.output_dir, envimet=args.envimet,
+                               analysis=not args.no_analysis)
         append_status(result)
         results.append(result)
 

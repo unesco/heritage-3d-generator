@@ -28,20 +28,50 @@ poetry run python upload_hf.py            # add --dry-run to preview
 Every generated site is checked by an automated **quality gate** (`quality_gate.py`):
 models with degenerate geometry, missing terrain, or missing buildings (for
 Cultural/Mixed sites) are **failed** and never uploaded; models built from
-degraded fallback data sources are **flagged** for manual review. Each site
-directory contains `model.obj`/`model.mtl`, a `preview.png` for visual
-inspection, `metadata.json` (provenance + generation config), and
-`quality.json` (metrics + status).
-
-Prerequisite: Earth Engine authentication (`poetry run earthengine authenticate`,
-project ID via `EE_PROJECT_ID` in `.env` — copy `.env.example` and set your own
-GEE project id; `.env` is git-ignored).
+degraded fallback data sources are **flagged** for manual review.
 
 Each site directory contains `model.obj`/`model.mtl` (voxel), `model.glb`
 (web-friendly voxel, Y-up, colored), `model_smooth.glb` (non-voxel hybrid:
 triangulated DEM terrain + LOD1 building prisms), a `preview.png` for visual
-inspection, `metadata.json` (provenance + generation config), and
-`quality.json` (metrics + status).
+inspection, `metadata.json` (provenance + generation config), `quality.json`
+(metrics + status), and the **analysis layers** described below.
+
+## ☀️ Analysis Layers — useful, not just beautiful
+
+Every model is more than a render: it ships with **environmental simulation
+layers** computed on the voxel grid (`analysis.py`, on by default — skip with
+`--no-analysis`):
+
+| Layer | Files | What it tells you |
+|-------|-------|-------------------|
+| ☀️ **Solar irradiance** (solstice noon) | `solar_solstice_noon.png/.npz` | Instantaneous sun exposure (W/m²), Jun 21 12:00 |
+| 📆 **Solar irradiance** (solstice day) | `solar_solstice_day.png/.npz` | Cumulative daily exposure (Wh/m²·day), Jun 21 |
+| 🌳 **Green View Index** | `green_index.png/.npz` | Vegetation visible at pedestrian level (0–1) |
+| 🌤️ **Sky View Index** | `sky_index.png/.npz` | Sky openness from the ground (0–1) |
+
+Solar layers use the **nearest EPW weather file** (auto-downloaded); view
+indices use a 1.5 m viewpoint height. PNGs are ready-made maps with colorbars;
+`.npz` files hold the raw grids for your own analysis:
+
+```python
+import numpy as np
+solar = np.load("output/whc/252_taj_mahal/solar_solstice_day.npz")["grid"]
+```
+
+Use cases: ☀️ solar-panel potential & heat-stress hotspots, 🌳 greenery/wellbeing
+assessment, 🌤️ canyon-effect & daylight studies, 🌡️ microclimate pre-screening
+for ENVI-met runs.
+
+To (re)compute analysis layers for already-generated sites without
+re-generating the models:
+
+```bash
+poetry run python backfill_analysis.py
+```
+
+Prerequisite: Earth Engine authentication (`poetry run earthengine authenticate`,
+project ID via `EE_PROJECT_ID` in `.env` — copy `.env.example` and set your own
+GEE project id; `.env` is git-ignored).
 
 ### 🤗 Running on Hugging Face Jobs (optional)
 
@@ -140,11 +170,13 @@ poetry run earthengine set_project <your-gee-project-id>
 heritage-3d-generator/
 ├── main.py                         # 🎯 Single-site CLI (site key, row number, or 'test')
 ├── pipeline.py                     # 🏗️ Shared generation core (VoxCity 1.6, fallback chain)
+├── analysis.py                     # ☀️ Solar irradiance + Green/Sky View Index layers
+├── backfill_analysis.py            # 🔁 Recompute analysis layers for existing sites
 ├── batch.py                        # 📦 Batch runner (pilot / selected / all, resume-safe)
 ├── quality_gate.py                 # 🎯 Quality metrics, pass/flag/fail, preview PNG
 ├── smooth_export.py                # 🏙️ Smooth GLB export (DEM terrain + LOD1 buildings)
 ├── regen_smooth.py                 # 🔁 Re-export smooth GLBs after exporter improvements
-├── upload_hf.py                    # 🤗 Publish passed models to a HF dataset
+├── upload_hf.py                    # 🤗 Publish passed models + dataset card to HF
 ├── unesco_data.py                  # 🌍 Fetch whc001 + mab001 catalogs (Huwise API)
 ├── submit_hf_job.sh                # ☁️ Run the pipeline on HF Jobs (optional)
 ├── quality_config.py               # 🎯 Quality configuration system
@@ -202,12 +234,18 @@ heritage-3d-generator/
 
 ### Generated Files
 ```
-output/
-├── Site_Name.obj                    # 3D model geometry
-├── Site_Name.mtl                    # Materials definition
-├── Site_Name_quality_report.txt     # Quality & technical specs
-├── Site_Name_colored.obj            # Enhanced colored model (if available)
-└── voxcity.INX                      # ENVI-MET simulation file
+output/<programme>/<site>/
+├── model.obj / model.mtl          # 3D model geometry (voxel)
+├── model.glb                      # Web-friendly voxel GLB (Y-up, colored)
+├── model_smooth.glb               # Smooth hybrid: DEM terrain + LOD1 buildings
+├── preview.png                    # 3D render for quick inspection
+├── solar_solstice_noon.png/.npz   # ☀️ Instantaneous irradiance (W/m²)
+├── solar_solstice_day.png/.npz    # ☀️ Cumulative daily irradiance (Wh/m²·day)
+├── green_index.png/.npz           # 🌳 Green View Index (0–1)
+├── sky_index.png/.npz             # 🌤️ Sky View Index (0–1)
+├── metadata.json                  # Provenance + generation config
+├── quality.json                   # Quality-gate metrics + status
+└── voxcity.INX                    # ENVI-MET simulation file (opt-in --envimet)
 ```
 
 ## 🏛️ UNESCO Heritage Sites Database
@@ -324,7 +362,8 @@ poetry run python main.py test --quality preview
 - **VoxCity Version**: 1.6.2 (new object-based API: `get_voxcity()` returns a `VoxCity` dataclass)
 - **Python**: 3.12+
 - **Dependencies**: Rich, Pandas, Earth Engine API, Tenacity, Hugging Face Hub, Requests
-- **Export Formats**: OBJ (+MTL), ENVI-MET (INX, opt-in via `--envimet`)
+- **Export Formats**: OBJ (+MTL), GLB (voxel + smooth hybrid), ENVI-MET (INX, opt-in via `--envimet`)
+- **Analysis Layers**: solar irradiance (EPW-based), Green/Sky View Index (PNG + raw `.npz`)
 - **Data Sources**: OpenStreetMap, Google Earth Engine, ESRI, Microsoft
 - **Site Catalogs**: UNESCO data.unesco.org (Huwise API) — whc001 (1,244 sites) + mab001 (797 sites)
 - **Quality Gate**: automated metrics + pass/flag/fail before any HF publication
@@ -333,11 +372,12 @@ poetry run python main.py test --quality preview
 ## 🌟 Features
 
 - ✅ **Quality Preset System**: 4 optimized configurations
+- ✅ **Analysis Layers**: solar irradiance, Green/Sky View Index out of the box
 - ✅ **Interactive UI**: Rich console with progress bars
 - ✅ **Robust Generation**: Automatic fallback on failures
-- ✅ **Multiple Exports**: OBJ, ENVI-MET, colored models
-- ✅ **Heritage Database**: 10 UNESCO World Heritage Sites
-- ✅ **Quality Reports**: Detailed technical documentation
+- ✅ **Multiple Exports**: OBJ, GLB (voxel + smooth), ENVI-MET, colored models
+- ✅ **Heritage Catalog**: 2,000+ sites from UNESCO open data (whc001 + mab001)
+- ✅ **Quality Gate**: automated pass/flag/fail before any publication
 - ✅ **Easy Setup**: Automated configuration and validation
 
 ## License

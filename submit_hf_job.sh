@@ -40,7 +40,8 @@ hf repos create "$CODE_REPO" --type dataset --private --exist-ok
 STAGING=$(mktemp -d)
 trap 'rm -rf "$STAGING"' EXIT
 cp main.py pipeline.py batch.py quality_gate.py quality_config.py \
-   unesco_data.py upload_hf.py smooth_export.py regen_smooth.py "$STAGING/"
+   unesco_data.py upload_hf.py smooth_export.py regen_smooth.py \
+   analysis.py backfill_analysis.py "$STAGING/"
 hf upload "$CODE_REPO" "$STAGING" --type dataset --private \
   --commit-message "pipeline code $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
